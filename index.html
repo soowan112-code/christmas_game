@@ -1,0 +1,1754 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>🎄 크리스마스 트리 꾸미기 - 바구니 받기 게임</title>
+
+    <script>
+      // GitHub Pages 하위 경로(/christmas-game) 접속 시 끝에 '/'가 없으면 상대경로 404 방지 자동 보정
+      if (window.location.protocol.startsWith('http') && !window.location.pathname.endsWith('/') && !window.location.pathname.endsWith('.html')) {
+        window.location.replace(window.location.pathname + '/' + window.location.search + window.location.hash);
+      }
+    </script>
+
+    <!-- Three.js (r128) 및 필수 라이브러리 로드 -->
+    <script src="assets/three.min.js"></script>
+    <script src="assets/GLTFLoader.js"></script>
+    <script src="assets/OrbitControls.js"></script>
+
+    <!-- CDN 백업 로더 (로컬 assets 파일이 누락되거나 404일 경우 자동 복구) -->
+    <script>
+      if (typeof THREE !== 'undefined') {
+        if (typeof THREE.GLTFLoader === 'undefined') {
+          document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script>');
+        }
+        if (typeof THREE.OrbitControls === 'undefined') {
+          document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"><\/script>');
+        }
+      }
+    </script>
+
+    <!-- file:// 직접 실행 시 Base64 데이터 파일 동적 로드 (GitHub 배포/웹 환경에서는 116MB 다운로드 생략) -->
+    <script>
+      if (window.location.protocol === 'file:') {
+        document.write('<script src="assets/models_data.js"><\/script>');
+      }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;600;800&family=Mountains+of+Christmas:wght@700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #0f172a;
+        font-family: 'Gowun Dodum', 'Noto Sans KR', sans-serif;
+      }
+      #webgl-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+        z-index: 1;
+        cursor: grab;
+      }
+      #webgl-canvas:active {
+        cursor: grabbing;
+      }
+
+      /* ── 상단 사운드 토글 ── */
+      .sound-btn {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 50;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.92);
+        border: 2px solid #ffffff;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+      .sound-btn:hover {
+        transform: scale(1.08);
+        background: #ffffff;
+      }
+
+      /* ── 인트로 화면 (화면 1) ── */
+      #screen-intro {
+        position: fixed;
+        inset: 0;
+        z-index: 30;
+        background: radial-gradient(circle at center, rgba(30, 58, 110, 0.78) 0%, rgba(10, 20, 45, 0.94) 100%);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        transition: opacity 0.5s ease, visibility 0.5s ease;
+      }
+      #screen-intro.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .intro-card {
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 28px;
+        padding: 40px 36px;
+        max-width: 500px;
+        width: 100%;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 0 40px rgba(255, 215, 0, 0.2);
+        border: 3px solid #ffeedd;
+        animation: cardFloat 3s ease-in-out infinite alternate;
+      }
+      @keyframes cardFloat {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-8px); }
+      }
+      .intro-badge {
+        display: inline-block;
+        background: #fee2e2;
+        color: #b91c1c;
+        font-weight: 700;
+        font-size: 13px;
+        padding: 6px 14px;
+        border-radius: 20px;
+        margin-bottom: 12px;
+      }
+      .intro-title {
+        font-family: 'Mountains of Christmas', 'Gowun Dodum', cursive;
+        font-size: 40px;
+        font-weight: 700;
+        color: #991b1b;
+        margin-bottom: 12px;
+      }
+      .intro-desc {
+        color: #334155;
+        font-size: 15px;
+        line-height: 1.65;
+        margin-bottom: 22px;
+        word-break: keep-all;
+      }
+      .how-to-box {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 16px;
+        padding: 18px;
+        margin-bottom: 26px;
+        text-align: left;
+        font-size: 14px;
+        color: #475569;
+        line-height: 1.85;
+      }
+      .how-to-box b {
+        color: #0f172a;
+      }
+      .btn-start {
+        width: 100%;
+        padding: 16px 28px;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: #ffffff;
+        font-size: 20px;
+        font-weight: 700;
+        border: none;
+        border-radius: 50px;
+        box-shadow: 0 10px 25px rgba(220, 38, 38, 0.35);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      .btn-start:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 14px 28px rgba(220, 38, 38, 0.45);
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      }
+
+      /* ── 게임 진행 HUD (화면 2) ── */
+      #game-hud {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+      }
+      #game-hud.hidden {
+        opacity: 0;
+      }
+      .score-board {
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(10px);
+        padding: 10px 24px;
+        border-radius: 40px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+        border: 2px solid #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+      .score-label {
+        font-size: 15px;
+        font-weight: 700;
+        color: #475569;
+      }
+      .score-value {
+        font-size: 24px;
+        font-weight: 800;
+        color: #dc2626;
+        min-width: 60px;
+        text-align: center;
+      }
+      .progress-bar-bg {
+        width: 140px;
+        height: 12px;
+        background: #e2e8f0;
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .progress-bar-fill {
+        width: 0%;
+        height: 100%;
+        background: linear-gradient(90deg, #f59e0b, #ef4444);
+        border-radius: 10px;
+        transition: width 0.3s ease-out;
+      }
+
+      /* 하단 조작 가이드 안내바 */
+      .control-guide-bar {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        background: rgba(15, 23, 42, 0.82);
+        backdrop-filter: blur(8px);
+        color: #ffffff;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 11px 26px;
+        border-radius: 30px;
+        font-size: 13.5px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        pointer-events: none;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+        transition: opacity 0.4s ease;
+      }
+      .control-guide-bar.hidden {
+        opacity: 0;
+      }
+      .guide-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .key-cap {
+        background: #334155;
+        border: 1px solid #94a3b8;
+        padding: 3px 9px;
+        border-radius: 6px;
+        font-weight: 800;
+        font-size: 11.5px;
+        color: #f8fafc;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      }
+
+      /* 팝업 피드백 (+1 점) */
+      .float-indicator {
+        position: fixed;
+        pointer-events: none;
+        color: #ffde59;
+        font-size: 30px;
+        font-weight: 800;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+        animation: floatUp 0.8s ease-out forwards;
+        z-index: 25;
+      }
+      @keyframes floatUp {
+        0% { opacity: 0; transform: translate(-50%, 0) scale(0.6); }
+        30% { opacity: 1; transform: translate(-50%, -20px) scale(1.2); }
+        100% { opacity: 0; transform: translate(-50%, -60px) scale(1); }
+      }
+
+      /* ── 5점 완료 축하 배너 ── */
+      #complete-banner {
+        position: fixed;
+        top: 35%;
+        left: 50%;
+        transform: translate(-50%, -50%) scale(0.7);
+        z-index: 30;
+        background: rgba(255, 255, 255, 0.95);
+        border: 3px solid #f59e0b;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+        border-radius: 28px;
+        padding: 30px 45px;
+        text-align: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+      }
+      #complete-banner.show {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+      }
+      .complete-title {
+        font-size: 32px;
+        font-weight: 800;
+        color: #b91c1c;
+        margin-bottom: 8px;
+      }
+      .complete-sub {
+        font-size: 16px;
+        color: #475569;
+      }
+
+      /* ── 트리 꾸미기 UI (화면 3) ── */
+      #tree-ui {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        pointer-events: none;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 24px;
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.6s ease, visibility 0.6s ease;
+      }
+      #tree-ui.show {
+        opacity: 1;
+        visibility: visible;
+      }
+      .tree-top-banner {
+        align-self: center;
+        background: rgba(255, 255, 255, 0.94);
+        backdrop-filter: blur(8px);
+        padding: 12px 28px;
+        border-radius: 40px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        text-align: center;
+        pointer-events: auto;
+      }
+      .tree-top-banner h2 {
+        font-size: 20px;
+        font-weight: 800;
+        color: #166534;
+      }
+      .tree-top-banner p {
+        font-size: 13px;
+        color: #4b5563;
+        margin-top: 2px;
+      }
+
+      /* 하단 오너먼트 트레이 */
+      .tree-bottom-bar {
+        align-self: center;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border: 2px solid #ffffff;
+        border-radius: 24px;
+        padding: 16px 22px;
+        max-width: 92vw;
+        width: 650px;
+        box-shadow: 0 12px 35px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        pointer-events: auto;
+      }
+      .tray-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .tray-title {
+        font-size: 15px;
+        font-weight: 700;
+        color: #1e293b;
+      }
+      .tray-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .btn-action {
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 13px;
+        font-weight: 700;
+        cursor: pointer;
+        border: none;
+        transition: all 0.2s;
+      }
+      .btn-auto-hang {
+        background: #16a34a;
+        color: #fff;
+      }
+      .btn-auto-hang:hover {
+        background: #15803d;
+      }
+      .btn-restart {
+        background: #f1f5f9;
+        color: #334155;
+      }
+      .btn-restart:hover {
+        background: #e2e8f0;
+      }
+
+      /* 오너먼트 아이템 목록 */
+      .ornament-list {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        overflow-x: auto;
+        padding-bottom: 4px;
+      }
+      .ornament-card {
+        flex: 0 0 84px;
+        height: 86px;
+        background: #ffffff;
+        border: 2px solid #e2e8f0;
+        border-radius: 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+        position: relative;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      }
+      .ornament-card:hover {
+        transform: translateY(-3px);
+        border-color: #f59e0b;
+        background: #fffbeb;
+      }
+      .ornament-card.placed {
+        opacity: 0.5;
+        border-color: #cbd5e1;
+        cursor: default;
+        background: #f1f5f9;
+      }
+      .ornament-badge {
+        font-size: 10px;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 8px;
+        color: #fff;
+      }
+      .ornament-icon {
+        font-size: 26px;
+      }
+      .ornament-name {
+        font-size: 11px;
+        font-weight: 700;
+        color: #334155;
+      }
+
+      /* 로딩 인디케이터 */
+      #loading-overlay {
+        position: fixed;
+        bottom: 24px;
+        left: 24px;
+        background: rgba(15, 23, 42, 0.85);
+        color: #fff;
+        padding: 10px 20px;
+        border-radius: 24px;
+        font-size: 13px;
+        font-weight: 600;
+        z-index: 100;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+        transition: opacity 0.4s ease;
+      }
+      #loading-overlay.hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 3D WebGL 캔버스 -->
+    <canvas id="webgl-canvas"></canvas>
+
+    <!-- 사운드 토글 버튼 -->
+    <button id="btn-sound" class="sound-btn" title="사운드 켜기/끄기">🔊</button>
+
+    <!-- 로딩 상태 표시 -->
+    <div id="loading-overlay">🎄 3D 오너먼트 준비 중... <span id="load-pct">0%</span></div>
+
+    <!-- ── 화면 1: 인트로 화면 ── -->
+    <div id="screen-intro">
+      <div class="intro-card">
+        <span class="intro-badge">✨ 2026 Winter Holiday Special</span>
+        <h1 class="intro-title">크리스마스 트리 꾸미기</h1>
+        <p class="intro-desc">
+          하늘에서 펑펑 쏟아지는 함박눈과 함께 반짝이는 7가지 참(Charm)들이 떨어집니다.<br />
+          바구니를 들고 눈밭을 걸으며 참을 <b>5개</b> 모아, 나만의 트리를 완성해보세요!
+        </p>
+
+        <div class="how-to-box">
+          <p>⬆️ ⬇️ <b>화살표 위/아래 (↑ / ↓):</b> 앞뒤로 걷기</p>
+          <p>⬅️ ➡️ <b>화살표 좌/우 (← / →):</b> 좌우로 이동하기</p>
+          <p>☁️ <b>W 키:</b> 하늘쪽으로 시선 올려다보기</p>
+          <p>⬇️ <b>S 키:</b> 아래쪽으로 고개 내리기</p>
+          <p>🧺 <b>바구니 받기:</b> 하늘에서 떨어지는 오너먼트 아래로 이동하여 <b>5개</b> 캐치!</p>
+          <p>🎄 <b>클리어 보상:</b> 5개 수집 시 모은 <b>3D 오너먼트로 트리 직접 장식</b></p>
+        </div>
+
+        <button id="btn-start-game" class="btn-start">
+          <span>게임 시작하기</span>
+          <span>▶</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── 화면 2: 게임 HUD ── -->
+    <div id="game-hud" class="hidden">
+      <div class="score-board">
+        <span class="score-label">🧺 모은 오너먼트</span>
+        <div class="progress-bar-bg">
+          <div id="progress-bar" class="progress-bar-fill"></div>
+        </div>
+        <span id="score-display" class="score-value">0 / 5</span>
+      </div>
+    </div>
+
+    <!-- 하단 조작 가이드 안내바 -->
+    <div id="control-guide" class="control-guide-bar hidden">
+      <div class="guide-item">
+        <span class="key-cap">↑</span><span class="key-cap">↓</span> 앞뒤 걷기
+      </div>
+      <div class="guide-item">
+        <span class="key-cap">←</span><span class="key-cap">→</span> 좌우 이동
+      </div>
+      <div class="guide-item">
+        <span class="key-cap">W</span> 하늘 올려다보기
+      </div>
+      <div class="guide-item">
+        <span class="key-cap">S</span> 아래 보기
+      </div>
+    </div>
+
+    <!-- 완료 축하 배너 -->
+    <div id="complete-banner">
+      <div class="complete-title">🎉 5개 수집 완료! 🎉</div>
+      <div class="complete-sub">이제 모은 3D 오너먼트로 크리스마스 트리를 꾸며보세요!</div>
+    </div>
+
+    <!-- ── 화면 3: 트리 꾸미기 UI ── -->
+    <div id="tree-ui">
+      <div class="tree-top-banner">
+        <h2>🎄 나만의 크리스마스 트리 완성하기</h2>
+        <p>마우스 드래그로 트리를 360도 돌려보고, 아래 모은 3D 오너먼트를 클릭해 트리에 걸어보세요!</p>
+      </div>
+
+      <div class="tree-bottom-bar">
+        <div class="tray-header">
+          <span class="tray-title">🎁 내가 모은 오너먼트 (<span id="placed-count">0</span>/5 장식됨)</span>
+          <div class="tray-actions">
+            <button id="btn-auto-hang" class="btn-action btn-auto-hang">✨ 한 번에 모두 장식하기</button>
+            <button id="btn-restart" class="btn-action btn-restart">🔄 다시 플레이</button>
+          </div>
+        </div>
+        <div id="ornament-tray" class="ornament-list">
+          <!-- 모은 오너먼트 카드 5개 -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ────────────────────────────────────────────── -->
+    <!-- 자바스크립트: 사운드 시스템 & Three.js 게임 엔진 -->
+    <!-- ────────────────────────────────────────────── -->
+    <script>
+      /* ============================================================
+         1. Web Audio API 기반 크리스마스 캐롤 BGM & SFX 엔진
+         ============================================================ */
+      class ChristmasAudio {
+        constructor() {
+          this.ctx = null;
+          this.isMuted = false;
+          this.isPlaying = false;
+          this.bgmTimer = null;
+          this.currentNoteIndex = 0;
+
+          this.melody = [
+            ['D4', 1], ['G4', 1], ['G4', 0.5], ['A4', 0.5], ['G4', 0.5], ['F#4', 0.5],
+            ['E4', 1], ['E4', 1], ['E4', 1], ['A4', 1], ['A4', 0.5], ['B4', 0.5],
+            ['A4', 0.5], ['G4', 0.5], ['F#4', 1], ['D4', 1], ['D4', 1], ['B4', 1],
+            ['B4', 0.5], ['C5', 0.5], ['B4', 0.5], ['A4', 0.5], ['G4', 1], ['E4', 1],
+            ['D4', 0.5], ['D4', 0.5], ['E4', 1], ['A4', 1], ['F#4', 1], ['G4', 2],
+            ['B4', 1], ['B4', 1], ['B4', 2], ['B4', 1], ['B4', 1], ['B4', 2],
+            ['B4', 1], ['D5', 1], ['G4', 1.5], ['A4', 0.5], ['B4', 3],
+            ['C5', 1], ['C5', 1], ['C5', 1.5], ['C5', 0.5], ['C5', 1], ['B4', 1], ['B4', 1],
+            ['B4', 0.5], ['B4', 0.5], ['B4', 1], ['A4', 1], ['A4', 1], ['B4', 1], ['A4', 2], ['D5', 2]
+          ];
+
+          this.noteFreqs = {
+            'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'F#4': 369.99,
+            'G4': 392.00, 'A4': 440.00, 'B4': 493.88, 'C5': 523.25, 'D5': 587.33,
+            'E5': 659.25, 'F#5': 739.99, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+            'C6': 1046.50, 'E6': 1318.51, 'G6': 1567.98, 'C7': 2093.00
+          };
+        }
+
+        init() {
+          if (!this.ctx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioContext();
+          }
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+        }
+
+        playBellNote(freq, startTime, duration, volume = 0.12) {
+          if (!this.ctx || this.isMuted) return;
+
+          const osc1 = this.ctx.createOscillator();
+          const osc2 = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(freq, startTime);
+
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(freq * 2.004, startTime);
+
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(volume, startTime + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration * 1.4);
+
+          osc1.connect(gain);
+          osc2.connect(gain);
+          gain.connect(this.ctx.destination);
+
+          osc1.start(startTime);
+          osc2.start(startTime);
+          osc1.stop(startTime + duration * 1.5);
+          osc2.stop(startTime + duration * 1.5);
+        }
+
+        startBGM() {
+          this.init();
+          if (this.isPlaying) return;
+          this.isPlaying = true;
+          this.scheduleNextBGMNote();
+        }
+
+        scheduleNextBGMNote() {
+          if (!this.isPlaying || !this.ctx) return;
+
+          const tempo = 0.28;
+          const noteInfo = this.melody[this.currentNoteIndex];
+          const noteName = noteInfo[0];
+          const duration = noteInfo[1] * tempo;
+          const freq = this.noteFreqs[noteName] || 440;
+
+          const now = this.ctx.currentTime;
+          this.playBellNote(freq, now, duration * 0.9, 0.08);
+
+          if (this.currentNoteIndex % 4 === 0) {
+            const bassFreq = freq * 0.5;
+            this.playBellNote(bassFreq, now, duration * 2.0, 0.04);
+          }
+
+          this.currentNoteIndex = (this.currentNoteIndex + 1) % this.melody.length;
+          this.bgmTimer = setTimeout(() => {
+            this.scheduleNextBGMNote();
+          }, duration * 1000);
+        }
+
+        toggleMute() {
+          this.isMuted = !this.isMuted;
+          return this.isMuted;
+        }
+
+        playCatchSound() {
+          this.init();
+          if (!this.ctx || this.isMuted) return;
+          const now = this.ctx.currentTime;
+          const chord = [1046.50, 1318.51, 1567.98, 2093.00];
+          chord.forEach((freq, idx) => {
+            this.playBellNote(freq, now + idx * 0.035, 0.6, 0.16);
+          });
+        }
+
+        playHangSound() {
+          this.init();
+          if (!this.ctx || this.isMuted) return;
+          const now = this.ctx.currentTime;
+          const notes = [1318.51, 1760.0, 2217.46, 2637.0];
+          notes.forEach((freq, idx) => {
+            this.playBellNote(freq, now + idx * 0.045, 0.8, 0.18);
+          });
+        }
+
+        playCompleteFanfare() {
+          this.init();
+          if (!this.ctx || this.isMuted) return;
+          const now = this.ctx.currentTime;
+          const fanfare = [
+            [523.25, 0.15], [659.25, 0.15], [783.99, 0.15],
+            [1046.5, 0.35], [783.99, 0.15], [1046.5, 0.6]
+          ];
+          let time = now;
+          fanfare.forEach(([freq, dur]) => {
+            this.playBellNote(freq, time, dur * 1.5, 0.22);
+            time += dur;
+          });
+        }
+      }
+
+      /* ============================================================
+         2. Three.js 메인 3D 게임 엔진
+         ============================================================ */
+      const audio = new ChristmasAudio();
+
+      const STATE = {
+        INTRO: 0,
+        PLAYING: 1,
+        COMPLETING: 2,
+        TREE_DECORATE: 3
+      };
+      let currentState = STATE.INTRO;
+
+      let score = 0;
+      const TARGET_SCORE = 5;
+      const collectedCharms = [];
+
+      const CHARM_META = [
+        { name: '골드 스타', color: '#f59e0b', icon: '⭐' },
+        { name: '루비 베리', color: '#ef4444', icon: '🍓' },
+        { name: '에메랄드', color: '#10b981', icon: '💎' },
+        { name: '아이스 눈꽃', color: '#06b6d4', icon: '❄️' },
+        { name: '실버 차임', color: '#6366f1', icon: '🔔' },
+        { name: '스위트 하트', color: '#ec4899', icon: '💖' },
+        { name: '홀리데이 선물', color: '#8b5cf6', icon: '🎁' }
+      ];
+
+      // Three.js 글로벌 객체
+      let scene, camera, renderer, clock;
+      let treeGroup, treeStarMesh, treeLights = [];
+      let basketGroup;
+      let snowParticles;
+      let orbitControls;
+
+      const playerPos = new THREE.Vector3(0, 1.75, 4.0);
+      let cameraYaw = 0;
+      let cameraPitch = 0.35;
+
+      const inputKeys = {
+        walkForward: false,  // ArrowUp
+        walkBackward: false, // ArrowDown
+        walkLeft: false,     // ArrowLeft
+        walkRight: false,    // ArrowRight
+        lookUp: false,       // W (KeyW, ㅈ)
+        lookDown: false      // S (KeyS, ㄴ)
+      };
+
+      let basketRecoil = 0;
+      const activeFallingObjects = [];
+      let lastSpawnTime = 0;
+      const loadedGltfTemplates = {};
+
+      const treeOrnamentAnchors = [
+        { x: 2.5, y: 1.4, z: 0.8, rotY: 0.3 },
+        { x: -2.2, y: 1.4, z: 1.5, rotY: 0.8 },
+        { x: 0.0, y: 2.2, z: 2.2, rotY: Math.PI * 0.5 },
+        { x: 1.8, y: 2.2, z: -1.2, rotY: -0.3 },
+        { x: -1.2, y: 3.1, z: 1.2, rotY: 0.6 }
+      ];
+
+      // DOM 캐시
+      const canvasEl = document.getElementById('webgl-canvas');
+      const screenIntro = document.getElementById('screen-intro');
+      const gameHud = document.getElementById('game-hud');
+      const controlGuide = document.getElementById('control-guide');
+      const scoreDisplay = document.getElementById('score-display');
+      const progressBar = document.getElementById('progress-bar');
+      const completeBanner = document.getElementById('complete-banner');
+      const treeUi = document.getElementById('tree-ui');
+      const ornamentTray = document.getElementById('ornament-tray');
+      const placedCountEl = document.getElementById('placed-count');
+      const btnSound = document.getElementById('btn-sound');
+      const btnStart = document.getElementById('btn-start-game');
+      const btnAutoHang = document.getElementById('btn-auto-hang');
+      const btnRestart = document.getElementById('btn-restart');
+      const loadOverlay = document.getElementById('loading-overlay');
+      const loadPct = document.getElementById('load-pct');
+
+      // ── 초기화 실행 ──
+      initThree();
+      createWinterEnvironment();
+      createSnowfall();
+      createBasket();
+      createChristmasTree();
+      setupEventListeners();
+      animate();
+
+      // DOM 준비 후 안전하게 모델 로드 시작
+      window.addEventListener('DOMContentLoaded', () => {
+        loadCharmAssets();
+      });
+
+      /* ── Three.js Scene, Camera, Renderer ── */
+      function initThree() {
+        clock = new THREE.Clock();
+
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x284768);
+        scene.fog = new THREE.FogExp2(0x3e6080, 0.022);
+
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.rotation.order = 'YXZ';
+        camera.position.copy(playerPos);
+        updateCameraRotation();
+
+        renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.2;
+
+        initOrbitControls();
+
+        const hemiLight = new THREE.HemisphereLight(0xe2f1fc, 0x6e8499, 1.0);
+        scene.add(hemiLight);
+
+        const sunLight = new THREE.DirectionalLight(0xfffaed, 1.4);
+        sunLight.position.set(6, 16, 7);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 1024;
+        sunLight.shadow.mapSize.height = 1024;
+        scene.add(sunLight);
+
+        const fillLight = new THREE.DirectionalLight(0xbdd8f0, 0.8);
+        fillLight.position.set(-8, 10, -5);
+        scene.add(fillLight);
+      }
+
+      function initOrbitControls() {
+        if (orbitControls) return;
+        if (typeof THREE !== 'undefined' && typeof THREE.OrbitControls === 'function') {
+          orbitControls = new THREE.OrbitControls(camera, renderer.domElement);
+          orbitControls.enabled = false;
+          orbitControls.enableDamping = true;
+          orbitControls.dampingFactor = 0.05;
+          orbitControls.maxPolarAngle = Math.PI / 2 + 0.05;
+          orbitControls.minDistance = 3.5;
+          orbitControls.maxDistance = 12.0;
+        }
+      }
+
+      /* ── 겨울 환경 & 지면 생성 ── */
+      function createWinterEnvironment() {
+        const groundGeo = new THREE.PlaneGeometry(80, 80, 32, 32);
+        const groundMat = new THREE.MeshStandardMaterial({
+          color: 0xf1f5f9,
+          roughness: 0.9,
+          metalness: 0.05
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        const skyGeo = new THREE.SphereGeometry(60, 32, 16);
+        const skyMat = new THREE.ShaderMaterial({
+          uniforms: {
+            topColor: { value: new THREE.Color(0x102a45) },
+            bottomColor: { value: new THREE.Color(0x8faec7) },
+            offset: { value: 3 },
+            exponent: { value: 0.75 }
+          },
+          vertexShader: `
+            varying vec3 vWorldPosition;
+            void main() {
+              vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+              vWorldPosition = worldPosition.xyz;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 topColor;
+            uniform vec3 bottomColor;
+            uniform float offset;
+            uniform float exponent;
+            varying vec3 vWorldPosition;
+            void main() {
+              float h = normalize(vWorldPosition + offset).y;
+              gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+            }
+          `,
+          side: THREE.BackSide
+        });
+        const sky = new THREE.Mesh(skyGeo, skyMat);
+        scene.add(sky);
+      }
+
+      /* ── 펑펑 쏟아지는 함박눈 파티클 시스템 ── */
+      function createSnowfall() {
+        const snowCount = 1500;
+        const snowGeo = new THREE.BufferGeometry();
+        const positions = new Float32Array(snowCount * 3);
+        const velocities = new Float32Array(snowCount * 3);
+
+        for (let i = 0; i < snowCount; i++) {
+          positions[i * 3 + 0] = (Math.random() - 0.5) * 45;
+          positions[i * 3 + 1] = Math.random() * 26;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 45;
+
+          velocities[i * 3 + 0] = (Math.random() - 0.5) * 0.4;
+          velocities[i * 3 + 1] = 1.4 + Math.random() * 1.8;
+          velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.4;
+        }
+
+        snowGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        snowGeo.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        grad.addColorStop(0.5, 'rgba(255, 255, 255, 0.7)');
+        grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(16, 16, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        const snowTexture = new THREE.CanvasTexture(canvas);
+        const snowMat = new THREE.PointsMaterial({
+          size: 0.24,
+          map: snowTexture,
+          transparent: true,
+          opacity: 0.9,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending
+        });
+
+        snowParticles = new THREE.Points(snowGeo, snowMat);
+        scene.add(snowParticles);
+      }
+
+      /* ── 3D 플레이어 바구니 ── */
+      function createBasket() {
+        basketGroup = new THREE.Group();
+
+        const basketBodyGeo = new THREE.CylinderGeometry(0.52, 0.32, 0.4, 28, 1, true);
+        const wickerMat = new THREE.MeshStandardMaterial({
+          color: 0x96613d,
+          roughness: 0.75,
+          metalness: 0.1,
+          side: THREE.DoubleSide
+        });
+        const body = new THREE.Mesh(basketBodyGeo, wickerMat);
+        body.castShadow = true;
+        basketGroup.add(body);
+
+        const bottomGeo = new THREE.CircleGeometry(0.32, 28);
+        const bottomMat = new THREE.MeshStandardMaterial({ color: 0x6e4324, roughness: 0.8 });
+        const bottom = new THREE.Mesh(bottomGeo, bottomMat);
+        bottom.rotation.x = Math.PI / 2;
+        bottom.position.y = -0.2;
+        basketGroup.add(bottom);
+
+        const rimGeo = new THREE.TorusGeometry(0.52, 0.045, 12, 32);
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xdeb887, roughness: 0.5 });
+        const rim = new THREE.Mesh(rimGeo, rimMat);
+        rim.rotation.x = Math.PI / 2;
+        rim.position.y = 0.2;
+        basketGroup.add(rim);
+
+        const ribbonGeo = new THREE.TorusGeometry(0.525, 0.022, 12, 32);
+        const ribbonMat = new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.4 });
+        const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+        ribbon.rotation.x = Math.PI / 2;
+        ribbon.position.y = 0.12;
+        basketGroup.add(ribbon);
+
+        const handleGeo = new THREE.TorusGeometry(0.53, 0.035, 12, 36, Math.PI);
+        const handle = new THREE.Mesh(handleGeo, rimMat);
+        handle.rotation.z = Math.PI;
+        handle.position.y = 0.2;
+        basketGroup.add(handle);
+
+        camera.add(basketGroup);
+        basketGroup.position.set(0, -0.48, -1.05);
+        basketGroup.rotation.x = -0.15;
+        scene.add(camera);
+      }
+
+      /* ── 3D 풍성한 크리스마스 트리 생성 ── */
+      function createChristmasTree() {
+        treeGroup = new THREE.Group();
+        treeGroup.position.set(0, 0, 0);
+
+        const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 1.5, 16);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x4a2e18, roughness: 0.9 });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 0.75;
+        trunk.castShadow = true;
+        treeGroup.add(trunk);
+
+        const tiers = [
+          { r: 2.4, h: 1.8, y: 1.6 },
+          { r: 2.0, h: 1.6, y: 2.5 },
+          { r: 1.6, h: 1.4, y: 3.3 },
+          { r: 1.2, h: 1.2, y: 4.0 },
+          { r: 0.8, h: 1.0, y: 4.6 }
+        ];
+
+        const pineMat = new THREE.MeshStandardMaterial({
+          color: 0x164e3f,
+          roughness: 0.75,
+          metalness: 0.1
+        });
+        const snowMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95 });
+
+        tiers.forEach((t) => {
+          const coneGeo = new THREE.ConeGeometry(t.r, t.h, 20);
+          const cone = new THREE.Mesh(coneGeo, pineMat);
+          cone.position.y = t.y;
+          cone.castShadow = true;
+          cone.receiveShadow = true;
+          treeGroup.add(cone);
+
+          const snowCapGeo = new THREE.ConeGeometry(t.r * 1.02, t.h * 0.35, 20);
+          const snowCap = new THREE.Mesh(snowCapGeo, snowMat);
+          snowCap.position.y = t.y - t.h * 0.32;
+          treeGroup.add(snowCap);
+        });
+
+        const starGeo = new THREE.OctahedronGeometry(0.42, 0);
+        const starMat = new THREE.MeshStandardMaterial({
+          color: 0xffd700,
+          emissive: 0xffb703,
+          emissiveIntensity: 0.85,
+          roughness: 0.2,
+          metalness: 0.8
+        });
+        treeStarMesh = new THREE.Mesh(starGeo, starMat);
+        treeStarMesh.position.y = 5.35;
+        treeGroup.add(treeStarMesh);
+
+        const starLight = new THREE.PointLight(0xffea79, 1.5, 9);
+        starLight.position.set(0, 5.35, 0);
+        treeGroup.add(starLight);
+
+        const lightColors = [0xff2a55, 0xffd166, 0x06d6a0, 0x118ab2, 0xff99c8];
+        const lightSphereGeo = new THREE.SphereGeometry(0.07, 8, 8);
+
+        for (let i = 0; i < 40; i++) {
+          const t = i / 40;
+          const angle = t * Math.PI * 14;
+          const y = 1.35 + t * 3.5;
+          const radius = (1 - t) * 2.2 + 0.22;
+          const x = Math.cos(angle) * radius;
+          const z = Math.sin(angle) * radius;
+
+          const color = lightColors[i % lightColors.length];
+          const bulbMat = new THREE.MeshStandardMaterial({
+            color: color,
+            emissive: color,
+            emissiveIntensity: 1.3
+          });
+          const bulb = new THREE.Mesh(lightSphereGeo, bulbMat);
+          bulb.position.set(x, y, z);
+          treeGroup.add(bulb);
+          treeLights.push(bulb);
+        }
+
+        const giftColors = [0xdc2626, 0x2563eb, 0xca8a04, 0x059669];
+        const giftPositions = [
+          [-1.2, 0.25, 0.9], [1.0, 0.3, 1.0], [-0.5, 0.2, 1.5], [1.3, 0.2, -0.6]
+        ];
+        giftPositions.forEach((pos, idx) => {
+          const size = 0.45 + (idx % 2) * 0.15;
+          const boxGeo = new THREE.BoxGeometry(size, size, size);
+          const boxMat = new THREE.MeshStandardMaterial({ color: giftColors[idx % giftColors.length] });
+          const gift = new THREE.Mesh(boxGeo, boxMat);
+          gift.position.set(pos[0], pos[1], pos[2]);
+          gift.rotation.y = idx * 0.7;
+          gift.castShadow = true;
+          treeGroup.add(gift);
+        });
+
+        treeGroup.visible = false;
+        scene.add(treeGroup);
+      }
+
+      /* ── 3D 모델 순차적 비동기 로딩: 브라우저 프리징 없이 0% -> 100% 실시간 갱신 ── */
+      function loadCharmAssets() {
+        const loader = new THREE.GLTFLoader();
+        let currentIndex = 0;
+        const totalModels = 7;
+
+        function base64ToArrayBuffer(base64) {
+          const binaryString = window.atob(base64);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          return bytes.buffer;
+        }
+
+        function onModelReady(index, gltf) {
+          const root = gltf.scene;
+          const box = new THREE.Box3().setFromObject(root);
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const targetScale = 1.0 / (maxDim || 1);
+          root.scale.setScalar(targetScale);
+
+          root.traverse((node) => {
+            if (node.isMesh) {
+              node.castShadow = true;
+              node.receiveShadow = true;
+              if (node.material) {
+                node.material.needsUpdate = true;
+              }
+            }
+          });
+
+          loadedGltfTemplates[index] = root;
+        }
+
+        // models_data.js 로드 확인 후 순차 실행 (웹/GitHub Pages 환경은 즉시 로드)
+        function checkAndStart() {
+          const isFileProtocol = window.location.protocol === 'file:';
+          if (isFileProtocol && typeof window.CHARM_GLB_DATA === 'undefined') {
+            loadPct.textContent = '로컬 데이터 준비 중...';
+            setTimeout(checkAndStart, 50);
+            return;
+          }
+          loadNextModel();
+        }
+
+        function loadNextModel() {
+          if (currentIndex >= totalModels) {
+            loadPct.textContent = '100%';
+            setTimeout(() => {
+              loadOverlay.classList.add('hidden');
+            }, 300);
+            return;
+          }
+
+          const modelIdx = currentIndex;
+          const pct = Math.round(((modelIdx + 1) / totalModels) * 100);
+
+          if (window.CHARM_GLB_DATA && window.CHARM_GLB_DATA[modelIdx]) {
+            try {
+              const arrayBuf = base64ToArrayBuffer(window.CHARM_GLB_DATA[modelIdx]);
+              loader.parse(
+                arrayBuf,
+                '',
+                (gltf) => {
+                  onModelReady(modelIdx, gltf);
+                  currentIndex++;
+                  loadPct.textContent = `${pct}%`;
+                  setTimeout(loadNextModel, 15);
+                },
+                (err) => {
+                  console.warn(`Model ${modelIdx + 1} parse fallback:`, err);
+                  loadViaHttp(modelIdx, pct);
+                }
+              );
+            } catch (e) {
+              console.warn(`Buffer error for model ${modelIdx + 1}:`, e);
+              loadViaHttp(modelIdx, pct);
+            }
+          } else {
+            // 웹서버 / GitHub Pages 환경 파일 직접 로드
+            loadViaHttp(modelIdx, pct);
+          }
+        }
+
+        function loadViaHttp(modelIdx, pct) {
+          const modelUrl = `assets/object-${modelIdx + 1}.glb`;
+          loader.load(
+            modelUrl,
+            (gltf) => {
+              onModelReady(modelIdx, gltf);
+              currentIndex++;
+              loadPct.textContent = `${pct}%`;
+              setTimeout(loadNextModel, 15);
+            },
+            (xhr) => {
+              if (xhr.lengthComputable && xhr.total > 0) {
+                const subPct = Math.round((xhr.loaded / xhr.total) * 100);
+                loadPct.textContent = `오너먼트 #${modelIdx + 1} (${subPct}%)`;
+              }
+            },
+            (err) => {
+              console.warn(`Load error for model ${modelIdx + 1} (${modelUrl}):`, err);
+              createProceduralCharmFallback(modelIdx);
+              currentIndex++;
+              loadPct.textContent = `${pct}%`;
+              setTimeout(loadNextModel, 15);
+            }
+          );
+        }
+
+        function createProceduralCharmFallback(index) {
+          const group = new THREE.Group();
+          const meta = CHARM_META[index] || { color: '#ef4444' };
+          const color = new THREE.Color(meta.color || 0xdc2626);
+          const mat = new THREE.MeshStandardMaterial({
+            color: color,
+            metalness: 0.75,
+            roughness: 0.25,
+            emissive: color.clone().multiplyScalar(0.2)
+          });
+          let geo;
+          if (index === 0) geo = new THREE.OctahedronGeometry(0.5, 0);
+          else if (index === 1) geo = new THREE.SphereGeometry(0.45, 16, 16);
+          else if (index === 2) geo = new THREE.IcosahedronGeometry(0.45, 0);
+          else if (index === 3) geo = new THREE.TorusKnotGeometry(0.3, 0.09, 32, 8);
+          else if (index === 4) geo = new THREE.CylinderGeometry(0.2, 0.45, 0.6, 16);
+          else if (index === 5) geo = new THREE.DodecahedronGeometry(0.45, 0);
+          else geo = new THREE.BoxGeometry(0.55, 0.55, 0.55);
+
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.castShadow = true;
+          mesh.receiveShadow = true;
+          group.add(mesh);
+          loadedGltfTemplates[index] = group;
+        }
+
+        checkAndStart();
+      }
+
+      /* ── 하늘에서 떨어지는 참(오너먼트) 생성 ── */
+      function spawnFallingCharm() {
+        if (currentState !== STATE.PLAYING) return;
+        const templateKeys = Object.keys(loadedGltfTemplates);
+        if (templateKeys.length === 0) return;
+
+        const randKey = templateKeys[Math.floor(Math.random() * templateKeys.length)];
+        const template = loadedGltfTemplates[randKey];
+        if (!template) return;
+
+        const clone = template.clone(true);
+
+        const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw);
+        const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw);
+
+        const spreadRight = (Math.random() - 0.5) * 4.0;
+        const spreadForward = 1.0 + Math.random() * 2.8;
+
+        const spawnX = playerPos.x + right.x * spreadRight + forward.x * spreadForward;
+        const spawnZ = playerPos.z + right.z * spreadRight + forward.z * spreadForward;
+        const spawnY = 14.5 + Math.random() * 3.0;
+
+        clone.position.set(spawnX, spawnY, spawnZ);
+        clone.scale.setScalar(0.48);
+
+        const fallingObj = {
+          mesh: clone,
+          modelIndex: parseInt(randKey, 10),
+          fallSpeed: 2.5 + Math.random() * 0.9,
+          rotSpeed: {
+            x: (Math.random() - 0.5) * 2.5,
+            y: (Math.random() - 0.5) * 3.5,
+            z: (Math.random() - 0.5) * 2.5
+          },
+          isCaught: false
+        };
+
+        scene.add(clone);
+        activeFallingObjects.push(fallingObj);
+      }
+
+      /* ── 바구니 캐치 판정 & 자석 흡입 보조 ── */
+      function updateFallingObjects(delta) {
+        const basketWorldPos = new THREE.Vector3();
+        basketGroup.getWorldPosition(basketWorldPos);
+
+        for (let i = activeFallingObjects.length - 1; i >= 0; i--) {
+          const item = activeFallingObjects[i];
+          const mesh = item.mesh;
+
+          if (item.isCaught) {
+            mesh.position.lerp(basketWorldPos, 0.25);
+            mesh.scale.multiplyScalar(0.8);
+            if (mesh.scale.x < 0.04) {
+              scene.remove(mesh);
+              activeFallingObjects.splice(i, 1);
+            }
+            continue;
+          }
+
+          mesh.rotation.x += item.rotSpeed.x * delta;
+          mesh.rotation.y += item.rotSpeed.y * delta;
+          mesh.rotation.z += item.rotSpeed.z * delta;
+          mesh.position.y -= item.fallSpeed * delta;
+
+          const dist = mesh.position.distanceTo(basketWorldPos);
+
+          if (dist < 1.15 && mesh.position.y > basketWorldPos.y) {
+            mesh.position.x += (basketWorldPos.x - mesh.position.x) * 0.16;
+            mesh.position.z += (basketWorldPos.z - mesh.position.z) * 0.16;
+          }
+
+          if (dist < 0.65 && Math.abs(mesh.position.y - basketWorldPos.y) < 0.45) {
+            item.isCaught = true;
+            onCharmCaught(item);
+            continue;
+          }
+
+          if (mesh.position.y < 0.2) {
+            scene.remove(mesh);
+            activeFallingObjects.splice(i, 1);
+          }
+        }
+      }
+
+      /* ── 오너먼트 캐치 시 점수 누적 (5개 목표 달성 체크) ── */
+      function onCharmCaught(item) {
+        score++;
+        collectedCharms.push({
+          modelIndex: item.modelIndex,
+          hungOnTree: false,
+          treeMesh: null
+        });
+
+        audio.playCatchSound();
+        basketRecoil = 0.25;
+
+        updateScoreHud();
+        createFloatIndicator('+1 🎁');
+
+        if (score >= TARGET_SCORE && currentState === STATE.PLAYING) {
+          triggerStageComplete();
+        }
+      }
+
+      function updateScoreHud() {
+        scoreDisplay.textContent = `${score} / ${TARGET_SCORE}`;
+        const pct = Math.min((score / TARGET_SCORE) * 100, 100);
+        progressBar.style.width = `${pct}%`;
+      }
+
+      function createFloatIndicator(text) {
+        const el = document.createElement('div');
+        el.className = 'float-indicator';
+        el.textContent = text;
+        el.style.left = '50%';
+        el.style.top = '60%';
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), 800);
+      }
+
+      /* ── 5개 완성 -> 트리 꾸미기 씬 전환 ── */
+      function triggerStageComplete() {
+        currentState = STATE.COMPLETING;
+        audio.playCompleteFanfare();
+
+        activeFallingObjects.forEach(item => scene.remove(item.mesh));
+        activeFallingObjects.length = 0;
+
+        completeBanner.classList.add('show');
+
+        setTimeout(() => {
+          completeBanner.classList.remove('show');
+          transitionToTreeScene();
+        }, 2200);
+      }
+
+      function transitionToTreeScene() {
+        currentState = STATE.TREE_DECORATE;
+
+        gameHud.classList.add('hidden');
+        controlGuide.classList.add('hidden');
+        basketGroup.visible = false;
+
+        treeGroup.visible = true;
+        treeUi.classList.add('show');
+
+        camera.position.set(0, 2.5, 7.5);
+        camera.lookAt(0, 2.2, 0);
+
+        if (!orbitControls) {
+          initOrbitControls();
+        }
+        if (orbitControls) {
+          orbitControls.enabled = true;
+          orbitControls.target.set(0, 2.3, 0);
+        }
+
+        renderOrnamentTray();
+      }
+
+      /* ── 트리 꾸미기: 모은 오너먼트 트레이 UI (5개) ── */
+      function renderOrnamentTray() {
+        ornamentTray.innerHTML = '';
+        collectedCharms.forEach((charm, idx) => {
+          const meta = CHARM_META[charm.modelIndex] || { name: `오너먼트 #${charm.modelIndex + 1}`, color: '#dc2626', icon: '🎁' };
+          const card = document.createElement('div');
+          card.className = 'ornament-card' + (charm.hungOnTree ? ' placed' : '');
+          card.innerHTML = `
+            <span class="ornament-badge" style="background:${meta.color}">#${charm.modelIndex + 1}</span>
+            <span class="ornament-icon">${meta.icon}</span>
+            <span class="ornament-name">${charm.hungOnTree ? '장식됨 ✨' : meta.name}</span>
+          `;
+          card.onclick = () => {
+            if (!charm.hungOnTree) {
+              hangCharmOnTree(idx);
+            }
+          };
+          ornamentTray.appendChild(card);
+        });
+
+        const placed = collectedCharms.filter(c => c.hungOnTree).length;
+        placedCountEl.textContent = placed;
+      }
+
+      /* ── 모은 3D GLB 오너먼트를 크리스마스 트리에 걸기 ── */
+      function hangCharmOnTree(charmIndex) {
+        const charm = collectedCharms[charmIndex];
+        if (!charm || charm.hungOnTree) return;
+
+        const template = loadedGltfTemplates[charm.modelIndex];
+        if (!template) return;
+
+        const ornament = template.clone(true);
+        ornament.scale.setScalar(0.72);
+
+        ornament.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            if (child.material) {
+              child.material.needsUpdate = true;
+            }
+          }
+        });
+
+        const placedIdx = collectedCharms.filter(c => c.hungOnTree).length;
+        const anchor = treeOrnamentAnchors[placedIdx % treeOrnamentAnchors.length];
+
+        ornament.position.set(anchor.x, anchor.y, anchor.z);
+        ornament.rotation.y = anchor.rotY;
+
+        const hangerGroup = new THREE.Group();
+        const stringGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.35, 8);
+        const goldMat = new THREE.MeshStandardMaterial({
+          color: 0xffd700,
+          metalness: 0.9,
+          roughness: 0.2
+        });
+        const stringMesh = new THREE.Mesh(stringGeo, goldMat);
+        stringMesh.position.y = 0.45;
+        hangerGroup.add(stringMesh);
+
+        const ringGeo = new THREE.TorusGeometry(0.07, 0.015, 8, 16);
+        const ringMesh = new THREE.Mesh(ringGeo, goldMat);
+        ringMesh.position.y = 0.62;
+        hangerGroup.add(ringMesh);
+
+        ornament.add(hangerGroup);
+        treeGroup.add(ornament);
+
+        charm.hungOnTree = true;
+        charm.treeMesh = ornament;
+
+        audio.playHangSound();
+        renderOrnamentTray();
+
+        const totalPlaced = collectedCharms.filter(c => c.hungOnTree).length;
+        if (totalPlaced >= TARGET_SCORE) {
+          triggerAllDecorated();
+        }
+      }
+
+      function triggerAllDecorated() {
+        createFloatIndicator('🎄 MERRY CHRISTMAS! 🎄');
+        audio.playCompleteFanfare();
+        if (treeStarMesh) {
+          treeStarMesh.material.emissiveIntensity = 2.2;
+        }
+      }
+
+      function updateCameraRotation() {
+        camera.rotation.y = cameraYaw;
+        camera.rotation.x = cameraPitch;
+      }
+
+      /* ── 키보드 이벤트 핸들러: Mac IME 한글/영문 완벽 지원 ── */
+      function setupEventListeners() {
+        btnStart.addEventListener('click', () => {
+          screenIntro.classList.add('hidden');
+          gameHud.classList.remove('hidden');
+          controlGuide.classList.remove('hidden');
+          currentState = STATE.PLAYING;
+          audio.startBGM();
+        });
+
+        btnSound.addEventListener('click', () => {
+          const muted = audio.toggleMute();
+          btnSound.textContent = muted ? '🔇' : '🔊';
+        });
+
+        btnAutoHang.addEventListener('click', () => {
+          collectedCharms.forEach((_, idx) => {
+            setTimeout(() => {
+              hangCharmOnTree(idx);
+            }, idx * 180);
+          });
+        });
+
+        btnRestart.addEventListener('click', resetGame);
+
+        window.addEventListener('keydown', (e) => {
+          if (currentState !== STATE.PLAYING) return;
+
+          // 화살표 위/아래: 앞뒤 걷기
+          if (e.code === 'ArrowUp') {
+            inputKeys.walkForward = true;
+            e.preventDefault();
+          } else if (e.code === 'ArrowDown') {
+            inputKeys.walkBackward = true;
+            e.preventDefault();
+          }
+
+          // 화살표 좌/우: 좌우 이동
+          if (e.code === 'ArrowLeft') {
+            inputKeys.walkLeft = true;
+            e.preventDefault();
+          } else if (e.code === 'ArrowRight') {
+            inputKeys.walkRight = true;
+            e.preventDefault();
+          }
+
+          // W: 시선 올려다보기 (e.code KeyW 및 한글 ㅈ 완벽 지원)
+          if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W' || e.key === 'ㅈ') {
+            inputKeys.lookUp = true;
+            e.preventDefault();
+          }
+
+          // S: 아래로 고개 내리기 (e.code KeyS 및 한글 ㄴ 완벽 지원)
+          if (e.code === 'KeyS' || e.key === 's' || e.key === 'S' || e.key === 'ㄴ') {
+            inputKeys.lookDown = true;
+            e.preventDefault();
+          }
+        });
+
+        window.addEventListener('keyup', (e) => {
+          if (e.code === 'ArrowUp') inputKeys.walkForward = false;
+          if (e.code === 'ArrowDown') inputKeys.walkBackward = false;
+          if (e.code === 'ArrowLeft') inputKeys.walkLeft = false;
+          if (e.code === 'ArrowRight') inputKeys.walkRight = false;
+
+          if (e.code === 'KeyW' || e.key === 'w' || e.key === 'W' || e.key === 'ㅈ') {
+            inputKeys.lookUp = false;
+          }
+          if (e.code === 'KeyS' || e.key === 's' || e.key === 'S' || e.key === 'ㄴ') {
+            inputKeys.lookDown = false;
+          }
+        });
+
+        window.addEventListener('resize', onWindowResize);
+      }
+
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+
+      /* ── 플레이어 걷기 물리 업데이트 ── */
+      function updatePlayerMovement(delta) {
+        if (currentState !== STATE.PLAYING) return;
+
+        const moveSpeed = 6.2;
+        const moveVec = new THREE.Vector3();
+
+        const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw);
+        const right = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), cameraYaw);
+
+        if (inputKeys.walkForward) moveVec.add(forward);
+        if (inputKeys.walkBackward) moveVec.sub(forward);
+        if (inputKeys.walkLeft) moveVec.sub(right);
+        if (inputKeys.walkRight) moveVec.add(right);
+
+        if (moveVec.lengthSq() > 0) {
+          moveVec.normalize();
+          playerPos.x += moveVec.x * moveSpeed * delta;
+          playerPos.z += moveVec.z * moveSpeed * delta;
+
+          playerPos.x = Math.max(-18, Math.min(18, playerPos.x));
+          playerPos.z = Math.max(-18, Math.min(18, playerPos.z));
+        }
+
+        camera.position.copy(playerPos);
+      }
+
+      function resetGame() {
+        score = 0;
+        updateScoreHud();
+
+        collectedCharms.forEach(c => {
+          if (c.treeMesh) {
+            treeGroup.remove(c.treeMesh);
+          }
+        });
+        collectedCharms.length = 0;
+
+        treeUi.classList.remove('show');
+        treeGroup.visible = false;
+        basketGroup.visible = true;
+        gameHud.classList.remove('hidden');
+        controlGuide.classList.remove('hidden');
+
+        playerPos.set(0, 1.75, 4.0);
+        cameraYaw = 0;
+        cameraPitch = 0.35;
+
+        inputKeys.walkForward = false;
+        inputKeys.walkBackward = false;
+        inputKeys.walkLeft = false;
+        inputKeys.walkRight = false;
+        inputKeys.lookUp = false;
+        inputKeys.lookDown = false;
+
+        camera.position.copy(playerPos);
+        updateCameraRotation();
+        if (orbitControls) {
+          orbitControls.enabled = false;
+        }
+
+        currentState = STATE.PLAYING;
+      }
+
+      /* ── 메인 애니메이션 루프 ── */
+      function animate() {
+        requestAnimationFrame(animate);
+
+        const delta = clock.getDelta();
+        const time = clock.getElapsedTime();
+
+        // 1. 함박눈 파티클 애니메이션
+        if (snowParticles) {
+          const positions = snowParticles.geometry.attributes.position.array;
+          const velocities = snowParticles.geometry.attributes.velocity.array;
+          const count = positions.length / 3;
+
+          for (let i = 0; i < count; i++) {
+            positions[i * 3 + 1] -= velocities[i * 3 + 1] * delta;
+            positions[i * 3 + 0] += Math.sin(time * 1.5 + i) * 0.015;
+            positions[i * 3 + 2] += Math.cos(time * 1.2 + i) * 0.012;
+
+            if (positions[i * 3 + 1] < -0.5) {
+              positions[i * 3 + 1] = 24 + Math.random() * 4;
+              positions[i * 3 + 0] = playerPos.x + (Math.random() - 0.5) * 45;
+              positions[i * 3 + 2] = playerPos.z + (Math.random() - 0.5) * 45;
+            }
+          }
+          snowParticles.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // 2. 플레이어 이동 및 W/S 시선 회전
+        if (currentState === STATE.PLAYING) {
+          updatePlayerMovement(delta);
+
+          const lookSpeed = 2.2;
+          if (inputKeys.lookUp) {
+            cameraPitch += lookSpeed * delta;
+          }
+          if (inputKeys.lookDown) {
+            cameraPitch -= lookSpeed * delta;
+          }
+
+          cameraPitch = Math.max(-0.45, Math.min(1.48, cameraPitch));
+          updateCameraRotation();
+
+          if (basketRecoil > 0) {
+            basketRecoil -= delta * 1.8;
+            if (basketRecoil < 0) basketRecoil = 0;
+          }
+          basketGroup.position.y = -0.48 - Math.sin(basketRecoil * Math.PI) * 0.12;
+
+          const isWalking = inputKeys.walkForward || inputKeys.walkBackward || inputKeys.walkLeft || inputKeys.walkRight;
+          if (isWalking) {
+            basketGroup.position.x = Math.sin(time * 8) * 0.035;
+          } else {
+            basketGroup.position.x = 0;
+          }
+
+          if (time - lastSpawnTime > 1.25) {
+            spawnFallingCharm();
+            lastSpawnTime = time;
+          }
+          updateFallingObjects(delta);
+        }
+
+        // 3. 트리에 매달린 오너먼트 흔들림 애니메이션
+        if (currentState === STATE.TREE_DECORATE) {
+          collectedCharms.forEach((charm, idx) => {
+            if (charm.treeMesh) {
+              charm.treeMesh.rotation.z = Math.sin(time * 2.5 + idx) * 0.12;
+              charm.treeMesh.rotation.x = Math.cos(time * 2.0 + idx) * 0.08;
+            }
+          });
+        }
+
+        // 4. 트리 전구 및 꼭대기 별 회전
+        if (treeStarMesh) {
+          treeStarMesh.rotation.y = time * 0.8;
+        }
+        treeLights.forEach((bulb, idx) => {
+          const intensity = 0.8 + Math.sin(time * 5 + idx * 1.2) * 0.7;
+          bulb.material.emissiveIntensity = intensity;
+        });
+
+        // 5. 트리 꾸미기 모드일 때 OrbitControls 회전 갱신
+        if (currentState === STATE.TREE_DECORATE && orbitControls && orbitControls.enabled) {
+          orbitControls.update();
+        }
+
+        renderer.render(scene, camera);
+      }
+    </script>
+  </body>
+</html>
